@@ -1,33 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><script data-od-sandbox-shim>(function(){
-  function makeStore(){
-    var data = {};
-    var api = {
-      getItem: function(k){ return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null; },
-      setItem: function(k, v){ data[k] = String(v); },
-      removeItem: function(k){ delete data[k]; },
-      clear: function(){ data = {}; },
-      key: function(i){ return Object.keys(data)[i] || null; }
-    };
-    Object.defineProperty(api, 'length', { get: function(){ return Object.keys(data).length; } });
-    return api;
-  }
-  function tryShim(name){
-    var works = false;
-    try { works = !!window[name] && typeof window[name].getItem === 'function'; void window[name].length; }
-    catch (_) { works = false; }
-    if (works) return;
-    try { Object.defineProperty(window, name, { configurable: true, value: makeStore() }); }
-    catch (_) { try { window[name] = makeStore(); } catch (__) {} }
-  }
-  tryShim('localStorage');
-  tryShim('sessionStorage');
-})();</script>
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Relatório de Tráfego Pago — 20 a 26/05</title>
+<title>Relatório de Tráfego Pago — 01/06</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -44,6 +20,7 @@
     --muted: #8490a8;
     --up: #5ecba1;
     --down: #e05c7a;
+    --modal-bg: rgba(13, 15, 20, 0.95);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -125,6 +102,35 @@
     letter-spacing: .05em;
   }
 
+  /* ── CAMPAIGN SUMMARY ── */
+  .campaign-summary {
+    background: rgba(232, 160, 74, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 32px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .campaign-summary h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent1);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .campaign-summary h4::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    background: var(--accent1);
+    border-radius: 50%;
+  }
+
   /* ── KPI GRID ── */
   .kpi-grid {
     display: grid;
@@ -139,9 +145,10 @@
     padding: 18px 16px 14px;
     position: relative;
     overflow: hidden;
-    transition: transform .2s, border-color .2s;
+    transition: transform .2s, border-color .2s, background .2s;
+    cursor: pointer;
   }
-  .kpi:hover { transform: translateY(-3px); border-color: var(--accent1); }
+  .kpi:hover { transform: translateY(-3px); border-color: var(--accent1); background: rgba(255,255,255,0.02); }
   .kpi::before {
     content: '';
     position: absolute;
@@ -169,14 +176,14 @@
     align-items: center;
     gap: 4px;
   }
-  .kpi-delta.up { color: var(--up); }
-  .kpi-delta.down { color: var(--down); }
+  .kpi-delta.good { color: var(--up); }
+  .kpi-delta.bad { color: var(--down); }
   .kpi-delta.neutral { color: var(--muted); }
 
   /* ── CHARTS GRID ── */
   .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
     gap: 20px;
   }
   .chart-card {
@@ -193,21 +200,7 @@
     color: var(--muted);
     margin-bottom: 20px;
   }
-  .chart-wrap { position: relative; height: 220px; }
-
-  /* ── OBSERVATION BOX ── */
-  .obs-box {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--accent1);
-    border-radius: 0 12px 12px 0;
-    padding: 16px 20px;
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 20px;
-    line-height: 1.6;
-  }
-  .obs-box strong { color: var(--text); }
+  .chart-wrap { position: relative; height: 280px; }
 
   /* ── EMAIL TABLE ── */
   .email-grid {
@@ -235,9 +228,50 @@
   .email-stat { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .email-stat-label { font-size: 11px; color: var(--muted); }
   .email-stat-value { font-size: 13px; font-weight: 600; }
-  .email-stat-delta { font-size: 10px; }
-  .email-stat-delta.up { color: var(--up); }
-  .email-stat-delta.down { color: var(--down); }
+
+  /* ── MODAL ── */
+  #modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--modal-bg);
+    backdrop-filter: blur(8px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  #modal-content {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 800px;
+    padding: 40px;
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  #modal-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 32px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  #modal-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+  }
+  #modal-header p {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 30px;
+  }
+  .history-chart-wrap { height: 350px; width: 100%; }
 
   /* ── FOOTER ── */
   footer {
@@ -257,9 +291,6 @@
     to   { opacity: 1; transform: translateY(0); }
   }
   .section { animation: fadeUp .5s ease both; }
-  .section:nth-child(2) { animation-delay: .1s; }
-  .section:nth-child(3) { animation-delay: .2s; }
-  .section:nth-child(4) { animation-delay: .3s; }
 </style>
 </head>
 <body>
@@ -267,174 +298,142 @@
 <header>
   <div class="header-tag">Relatório Semanal · Tráfego Pago</div>
   <h1>Desempenho das<br><span>Campanhas</span></h1>
-  <div class="header-sub">Período de referência: 18 a 26 de maio de 2025</div>
+  <div class="header-sub">Referência: 01 de junho de 2026</div>
   <div class="divider"></div>
 </header>
 
 <!-- ════════════════════════════════════════════
-     CAMPANHA 1 — TRILOGIA DOS PÁSSAROS BORDADOS
+     RESUMO GERAL
 ═════════════════════════════════════════════ -->
 <section class="section">
+  <div class="section-title">
+    Resumo Geral
+    <span class="badge" style="background:var(--accent2)">Status Atual</span>
+  </div>
+  <div class="section-date">Posição consolidada em 01/06</div>
+
+  <div class="charts-grid" style="grid-template-columns: 1fr;">
+    <div class="chart-card" style="max-width: 600px; margin: 0 auto;">
+      <h3>Distribuição do Investimento Atual</h3>
+      <div class="chart-wrap"><canvas id="dist_spend"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     CAMPANHA 1 — TRILOGIA DOS PÁSSAROS BORDADOS
+═════════════════════════════════════════════ -->
+<section class="section" id="trilogia">
   <div class="section-title">
     Trilogia dos Pássaros Bordados
     <span class="badge">Conversão</span>
   </div>
-  <div class="section-date">📅 20/05 a 26/05</div>
+  <div class="section-date">📅 25/05 a 01/06 · Métricas Totais</div>
 
-  <!-- PÚBLICO FRIO -->
-  <div class="sub-section">
-    <div class="sub-section-title" style="color:var(--accent2)">Público Frio</div>
-    <div class="kpi-grid">
-      <div class="kpi" style="--accent-color: var(--accent2)">
-        <div class="kpi-label">CPM</div>
-        <div class="kpi-value">R$&nbsp;40,81</div>
-        <div class="kpi-delta up">▲ vs R$&nbsp;36,13 sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent2)">
-        <div class="kpi-label">CTR</div>
-        <div class="kpi-value">5,59%</div>
-        <div class="kpi-delta up">▲ +1,08 pp sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Cliques</div>
-        <div class="kpi-value">216</div>
-        <div class="kpi-delta down">▼ 363 vs sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Visualizações</div>
-        <div class="kpi-value">172</div>
-        <div class="kpi-delta down">▼ 256 vs sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Tx de Visualização</div>
-        <div class="kpi-value">79,63%</div>
-        <div class="kpi-delta neutral">—</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent1)">
-        <div class="kpi-label">Valor Gasto</div>
-        <div class="kpi-value">R$&nbsp;157,62</div>
-        <div class="kpi-delta up">▲ R$&nbsp;97,52 sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent4)">
-        <div class="kpi-label">Finalizações</div>
-        <div class="kpi-value">4</div>
-        <div class="kpi-delta neutral">= igual sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Vendas</div>
-        <div class="kpi-value">0</div>
-        <div class="kpi-delta neutral">= igual sem. ant.</div>
-      </div>
-    </div>
+  <div class="campaign-summary">
+    <h4>Resumo de Performance</h4>
+    <p>A performance foi marcada por um aumento expressivo no engajamento (CTR de 6,94%). Embora tenha gerado 27 finalizações de compra (um aumento de 285%), a conversão final em vendas continua sendo o principal desafio, com apenas 1 venda registrada. A estratégia de conteúdo atraiu o público certo, mas há um gargalo evidente no fechamento do checkout.</p>
   </div>
 
-  <!-- PÚBLICO QUENTE -->
-  <div class="sub-section">
-    <div class="sub-section-title" style="color:var(--accent1)">Público Quente</div>
-    <div class="kpi-grid">
-      <div class="kpi" style="--accent-color: var(--accent2)">
-        <div class="kpi-label">CPM</div>
-        <div class="kpi-value">R$&nbsp;41,85</div>
-        <div class="kpi-delta up">▲ vs R$&nbsp;37,62 sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent2)">
-        <div class="kpi-label">CTR</div>
-        <div class="kpi-value">5,09%</div>
-        <div class="kpi-delta down">▼ 0,44 pp sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Cliques</div>
-        <div class="kpi-value">97</div>
-        <div class="kpi-delta down">▼ 567 vs sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Visualizações</div>
-        <div class="kpi-value">—</div>
-        <div class="kpi-delta neutral">—</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Tx de Visualização</div>
-        <div class="kpi-value">—</div>
-        <div class="kpi-delta neutral">—</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent1)">
-        <div class="kpi-label">Valor Gasto</div>
-        <div class="kpi-value">R$&nbsp;79,76</div>
-        <div class="kpi-delta up">▲ R$&nbsp;17,82 sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent4)">
-        <div class="kpi-label">Finalizações</div>
-        <div class="kpi-value">3</div>
-        <div class="kpi-delta neutral">= igual sem. ant.</div>
-      </div>
-      <div class="kpi" style="--accent-color: var(--accent3)">
-        <div class="kpi-label">Vendas</div>
-        <div class="kpi-value">0</div>
-        <div class="kpi-delta neutral">= igual sem. ant.</div>
-      </div>
+  <div class="kpi-grid">
+    <div class="kpi" data-metric="trilogia_cpm" style="--accent-color: var(--accent2)">
+      <div class="kpi-label">CPM</div>
+      <div class="kpi-value">R$&nbsp;37,16</div>
+      <div class="kpi-delta good">▼ R$&nbsp;3,99 vs sem. ant.</div>
     </div>
-  </div>
-
-  <div class="obs-box">
-    <strong>⚠️ Observação:</strong> Público unificado dentro do público quente na Quinta-feira, dia 21/05. Nenhuma venda registrada em ambos os públicos na semana.
+    <div class="kpi" data-metric="trilogia_ctr" style="--accent-color: var(--accent2)">
+      <div class="kpi-label">CTR</div>
+      <div class="kpi-value">6,94%</div>
+      <div class="kpi-delta good">▲ +2,42 pp sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="trilogia_cliques" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Cliques</div>
+      <div class="kpi-value">818</div>
+      <div class="kpi-delta good">▲ 505 vs sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="trilogia_vis" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Visualizações</div>
+      <div class="kpi-value">678</div>
+      <div class="kpi-delta good">▲ 443 vs sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="trilogia_vrate" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Tx de Visualização</div>
+      <div class="kpi-value">82,89%</div>
+      <div class="kpi-delta good">▲ +7,81 pp sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="trilogia_spend" style="--accent-color: var(--accent1)">
+      <div class="kpi-label">Valor Gasto</div>
+      <div class="kpi-value">R$&nbsp;437,68</div>
+      <div class="kpi-delta bad">▲ R$&nbsp;200,30 sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="trilogia_final" style="--accent-color: var(--accent4)">
+      <div class="kpi-label">Finalizações</div>
+      <div class="kpi-value">27</div>
+      <div class="kpi-delta good">▲ 20 vs sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="trilogia_sales" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Vendas</div>
+      <div class="kpi-value">1</div>
+      <div class="kpi-delta good">▲ 1 vs sem. ant.</div>
+    </div>
   </div>
 </section>
 
 <!-- ════════════════════════════════════════════
      CAMPANHA 2 — FUNIL DE CAPTAÇÃO DE LEADS
 ═════════════════════════════════════════════ -->
-<section class="section">
+<section class="section" id="leads">
   <div class="section-title">
     Funil de Captação de Leads
     <span class="badge" style="background:var(--accent2)">Lead Gen</span>
   </div>
-  <div class="section-date">📅 18/05 a 26/05</div>
+  <div class="section-date">📅 25/05 a 01/06</div>
+
+  <div class="campaign-summary">
+    <h4>Resumo de Performance</h4>
+    <p>A campanha manteve-se como o motor de crescimento da base, com 346 novos leads gerados. Entretanto, o custo por lead (CPL) subiu para R$ 0,65 (+32%), acompanhando a alta no CPM. A taxa de abertura dos e-mails iniciais permanece saudável (17,5%), mas há uma queda acentuada ao longo da sequência, sugerindo a necessidade de revisão no conteúdo dos e-mails 4, 5 e 6.</p>
+  </div>
 
   <div class="kpi-grid">
-    <div class="kpi" style="--accent-color: var(--accent2)">
+    <div class="kpi" data-metric="leads_cpm" style="--accent-color: var(--accent2)">
       <div class="kpi-label">CPM</div>
-      <div class="kpi-value">R$&nbsp;11,09</div>
-      <div class="kpi-delta down">▼ R$&nbsp;0,17 vs semana ant.</div>
+      <div class="kpi-value">R$&nbsp;11,60</div>
+      <div class="kpi-delta bad">▲ R$&nbsp;0,51 vs sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent2)">
+    <div class="kpi" data-metric="leads_ctr" style="--accent-color: var(--accent2)">
       <div class="kpi-label">CTR</div>
-      <div class="kpi-value">4,59%</div>
-      <div class="kpi-delta up">▲ +0,47 pp semana ant.</div>
+      <div class="kpi-value">3,70%</div>
+      <div class="kpi-delta bad">▼ 0,89 pp sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
+    <div class="kpi" data-metric="leads_cliques" style="--accent-color: var(--accent3)">
       <div class="kpi-label">Cliques</div>
-      <div class="kpi-value">556</div>
-      <div class="kpi-delta up">▲ 32 vs semana ant.</div>
+      <div class="kpi-value">718</div>
+      <div class="kpi-delta good">▲ 162 vs sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
+    <div class="kpi" data-metric="leads_vis" style="--accent-color: var(--accent3)">
       <div class="kpi-label">Visualizações</div>
-      <div class="kpi-value">483</div>
-      <div class="kpi-delta up">▲ 26 vs semana ant.</div>
+      <div class="kpi-value">618</div>
+      <div class="kpi-delta good">▲ 135 vs sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
+    <div class="kpi" data-metric="leads_count" style="--accent-color: var(--accent3)">
       <div class="kpi-label">Leads Gerados</div>
-      <div class="kpi-value">275</div>
-      <div class="kpi-delta up">▲ 4 vs semana ant.</div>
+      <div class="kpi-value">346</div>
+      <div class="kpi-delta good">▲ 71 vs sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent1)">
+    <div class="kpi" data-metric="leads_cpl" style="--accent-color: var(--accent1)">
       <div class="kpi-label">Custo por Lead</div>
-      <div class="kpi-value">R$&nbsp;0,49</div>
-      <div class="kpi-delta down">▼ R$&nbsp;0,04 vs semana ant.</div>
+      <div class="kpi-value">R$&nbsp;0,65</div>
+      <div class="kpi-delta bad">▲ R$&nbsp;0,16 vs sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent1)">
+    <div class="kpi" data-metric="leads_spend" style="--accent-color: var(--accent1)">
       <div class="kpi-label">Valor Gasto</div>
-      <div class="kpi-value">R$&nbsp;134,30</div>
-      <div class="kpi-delta down">▼ R$&nbsp;9,11 vs semana ant.</div>
+      <div class="kpi-value">R$&nbsp;225,29</div>
+      <div class="kpi-delta bad">▲ R$&nbsp;90,99 vs sem. ant.</div>
     </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
+    <div class="kpi" data-metric="leads_vrate" style="--accent-color: var(--accent3)">
       <div class="kpi-label">Tx de Visualização</div>
-      <div class="kpi-value">86,87%</div>
-      <div class="kpi-delta down">▼ 0,34 pp semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">Tx de Conversão</div>
-      <div class="kpi-value">56,94%</div>
-      <div class="kpi-delta down">▼ 2,36 pp semana ant.</div>
+      <div class="kpi-value">86,07%</div>
+      <div class="kpi-delta bad">▼ 0,80 pp semana ant.</div>
     </div>
   </div>
 
@@ -449,44 +448,36 @@
     </div>
   </div>
 
-  <!-- Email cards -->
-  <div style="margin-top:28px; margin-bottom:8px; font-size:12px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase;">Detalhamento por E-mail da Sequência</div>
   <div class="email-grid">
     <div class="email-card">
       <div class="email-tag">E-mail 1</div>
-      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">199 <span class="email-stat-delta down">▼15</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">17,6% <span class="email-stat-delta down">▼1,6pp</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Clique</span><span class="email-stat-value">1,01% <span class="email-stat-delta up">▲1pp</span></span></div>
+      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">223</span></div>
+      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">17,5%</span></div>
     </div>
     <div class="email-card">
       <div class="email-tag">E-mail 2</div>
-      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">199 <span class="email-stat-delta down">▼27</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">12,6% <span class="email-stat-delta down">▼2pp</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Clique</span><span class="email-stat-value">0,50% <span class="email-stat-delta down">▼1,3pp</span></span></div>
+      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">186</span></div>
+      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">14,0%</span></div>
     </div>
     <div class="email-card">
       <div class="email-tag">E-mail 3</div>
-      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">191 <span class="email-stat-delta down">▼37</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">12,6% <span class="email-stat-delta down">▼1,9pp</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Clique</span><span class="email-stat-value">1,57% <span class="email-stat-delta up">▲1,1pp</span></span></div>
+      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">144</span></div>
+      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">11,1%</span></div>
     </div>
     <div class="email-card">
       <div class="email-tag">E-mail 4</div>
-      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">237 <span class="email-stat-delta down">▼19</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">13,1% <span class="email-stat-delta down">▼2,2pp</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Clique</span><span class="email-stat-value">0,42% <span class="email-stat-delta down">▼0,8pp</span></span></div>
+      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">120</span></div>
+      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">10,0%</span></div>
     </div>
     <div class="email-card">
       <div class="email-tag">E-mail 5</div>
-      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">284 <span class="email-stat-delta up">▲37</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">11,6% <span class="email-stat-delta down">▼4,2pp</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Clique</span><span class="email-stat-value">0% <span class="email-stat-delta down">▼0,4pp</span></span></div>
+      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">124</span></div>
+      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">8,9%</span></div>
     </div>
     <div class="email-card">
       <div class="email-tag">E-mail 6</div>
-      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">323 <span class="email-stat-delta up">▲125</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">12,1% <span class="email-stat-delta down">▼2,6pp</span></span></div>
-      <div class="email-stat"><span class="email-stat-label">Clique</span><span class="email-stat-value">0,62% <span class="email-stat-delta down">▼0,9pp</span></span></div>
+      <div class="email-stat"><span class="email-stat-label">Envios</span><span class="email-stat-value">146</span></div>
+      <div class="email-stat"><span class="email-stat-label">Abertura</span><span class="email-stat-value">7,5%</span></div>
     </div>
   </div>
 </section>
@@ -494,91 +485,117 @@
 <!-- ════════════════════════════════════════════
      CAMPANHA 3 — PRODUTOS PARA BORDAR
 ═════════════════════════════════════════════ -->
-<section class="section">
+<section class="section" id="ecommerce">
   <div class="section-title">
     Produtos para Bordar
     <span class="badge" style="background:var(--accent3); color:#0d0f14">E-commerce</span>
   </div>
-  <div class="section-date">📅 18/05 a 26/05</div>
+  <div class="section-date">📅 25/05 a 01/06</div>
 
-  <div class="kpi-grid">
-    <div class="kpi" style="--accent-color: var(--accent2)">
-      <div class="kpi-label">CPM</div>
-      <div class="kpi-value">R$&nbsp;42,47</div>
-      <div class="kpi-delta up">▲ R$&nbsp;3,13 vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent2)">
-      <div class="kpi-label">CTR</div>
-      <div class="kpi-value">4,33%</div>
-      <div class="kpi-delta down">▼ 0,22 pp semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">Cliques</div>
-      <div class="kpi-value">302</div>
-      <div class="kpi-delta neutral">= igual semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">Tx Visualização</div>
-      <div class="kpi-value">75,17%</div>
-      <div class="kpi-delta down">▼ 5,96 pp semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent4)">
-      <div class="kpi-label">Finalizações</div>
-      <div class="kpi-value">5</div>
-      <div class="kpi-delta neutral">= igual semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">Vendas</div>
-      <div class="kpi-value">3</div>
-      <div class="kpi-delta down">▼ 1 vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent1)">
-      <div class="kpi-label">Valor Gasto</div>
-      <div class="kpi-value">R$&nbsp;358,08</div>
-      <div class="kpi-delta up">▲ R$&nbsp;44,18 vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">Faturamento Bruto</div>
-      <div class="kpi-value">R$&nbsp;513</div>
-      <div class="kpi-delta down">▼ R$&nbsp;171 vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">Lucro Estimado</div>
-      <div class="kpi-value">R$&nbsp;451,44</div>
-      <div class="kpi-delta down">▼ R$&nbsp;150,48 vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent1)">
-      <div class="kpi-label">CAC</div>
-      <div class="kpi-value">R$&nbsp;119,36</div>
-      <div class="kpi-delta up">▲ R$&nbsp;40,89 vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent3)">
-      <div class="kpi-label">ROI</div>
-      <div class="kpi-value">43,26%</div>
-      <div class="kpi-delta down">▼ 74,64 pp vs semana ant.</div>
-    </div>
-    <div class="kpi" style="--accent-color: var(--accent2)">
-      <div class="kpi-label">Tx Conversão</div>
-      <div class="kpi-value">1,32%</div>
-      <div class="kpi-delta down">▼ 0,31 pp semana ant.</div>
-    </div>
+  <div class="campaign-summary">
+    <h4>Resumo de Performance</h4>
+    <p>Semana crítica para o Kit Cultura Brasileira, que não registrou vendas ou finalizações, apesar do investimento de R$ 300,29. Embora o CPM tenha caído e a taxa de visualização tenha subido levemente, a ausência total de conversão no fundo do funil sugere que a oferta atual ou os criativos podem estar saturados para o público impactado.</p>
   </div>
 
-  <div class="charts-grid">
-    <div class="chart-card">
-      <h3>Vendas e Finalizações — Atual vs Anterior</h3>
-      <div class="chart-wrap"><canvas id="c3_sales"></canvas></div>
+  <div class="kpi-grid">
+    <div class="kpi" data-metric="eco_cpm" style="--accent-color: var(--accent2)">
+      <div class="kpi-label">CPM</div>
+      <div class="kpi-value">R$&nbsp;37,71</div>
+      <div class="kpi-delta good">▼ R$&nbsp;4,76 vs sem. ant.</div>
     </div>
-    <div class="chart-card">
-      <h3>ROI e CAC — Comparativo Semanal</h3>
-      <div class="chart-wrap"><canvas id="c3_roi"></canvas></div>
+    <div class="kpi" data-metric="eco_ctr" style="--accent-color: var(--accent2)">
+      <div class="kpi-label">CTR</div>
+      <div class="kpi-value">4,15%</div>
+      <div class="kpi-delta bad">▼ 0,18 pp sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="eco_cliques" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Cliques</div>
+      <div class="kpi-value">262</div>
+      <div class="kpi-delta bad">▼ 40 vs sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="eco_vrate" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Tx Visualização</div>
+      <div class="kpi-value">77,86%</div>
+      <div class="kpi-delta good">▲ +2,70 pp sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="eco_final" style="--accent-color: var(--accent4)">
+      <div class="kpi-label">Finalizações</div>
+      <div class="kpi-value">0</div>
+      <div class="kpi-delta bad">▼ 5 vs sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="eco_sales" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Vendas</div>
+      <div class="kpi-value">0</div>
+      <div class="kpi-delta bad">▼ 3 vs sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="eco_spend" style="--accent-color: var(--accent1)">
+      <div class="kpi-label">Valor Gasto</div>
+      <div class="kpi-value">R$&nbsp;300,29</div>
+      <div class="kpi-delta good">▼ R$&nbsp;57,79 sem. ant.</div>
+    </div>
+    <div class="kpi" data-metric="eco_fat" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Faturamento</div>
+      <div class="kpi-value">R$&nbsp;0</div>
+      <div class="kpi-delta bad">▼ R$&nbsp;513 vs sem. ant.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     CAMPANHA 4 — RECONHECIMENTO
+═════════════════════════════════════════════ -->
+<section class="section" id="brand">
+  <div class="section-title">
+    Reconhecimento de Marca
+    <span class="badge" style="background:var(--accent1); color:#0d0f14">Topo de Funil</span>
+  </div>
+  <div class="section-date">📅 25/05 a 01/06</div>
+
+  <div class="kpi-grid">
+    <div class="kpi" data-metric="brand_cpm" style="--accent-color: var(--accent2)">
+      <div class="kpi-label">CPM</div>
+      <div class="kpi-value">R$&nbsp;1,08</div>
+    </div>
+    <div class="kpi" data-metric="brand_ctr" style="--accent-color: var(--accent2)">
+      <div class="kpi-label">CTR</div>
+      <div class="kpi-value">0,29%</div>
+    </div>
+    <div class="kpi" data-metric="brand_alcance" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Alcance</div>
+      <div class="kpi-value">57.027</div>
+    </div>
+    <div class="kpi" data-metric="brand_imp" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Impressões</div>
+      <div class="kpi-value">68.252</div>
+    </div>
+    <div class="kpi" data-metric="brand_eng" style="--accent-color: var(--accent3)">
+      <div class="kpi-label">Engajamento</div>
+      <div class="kpi-value">3.954</div>
+    </div>
+    <div class="kpi" data-metric="brand_spend" style="--accent-color: var(--accent1)">
+      <div class="kpi-label">Valor Gasto</div>
+      <div class="kpi-value">R$&nbsp;73,52</div>
     </div>
   </div>
 </section>
 
 <footer>
-  Gerado em 26 de maio de 2025 · Tráfego Pago — Relatório Semanal
+  Gerado em 01 de junho de 2026 · Tráfego Pago — Relatório Semanal
 </footer>
+
+<!-- ── MODAL STRUCTURE ── -->
+<div id="modal-overlay">
+  <div id="modal-content">
+    <button id="modal-close">&times;</button>
+    <div id="modal-header">
+      <h2 id="modal-title">Histórico da Métrica</h2>
+      <p id="modal-subtitle">Evolução nas últimas 4 semanas</p>
+    </div>
+    <div class="history-chart-wrap">
+      <canvas id="history-chart"></canvas>
+    </div>
+  </div>
+</div>
 
 <script>
 Chart.defaults.color = '#8490a8';
@@ -589,7 +606,49 @@ const accent1 = '#e8a04a';
 const accent2 = '#5b8ef0';
 const accent3 = '#5ecba1';
 const accent4 = '#e05c7a';
-const cardBg  = '#1c2130';
+
+// ── DATA MAPPING FOR HISTORY ──
+const HISTORY_DATA = {
+  // Trilogia
+  'trilogia_cpm': { title: 'CPM — Trilogia', unit: 'R$', data: [35.20, 36.13, 41.15, 37.16] },
+  'trilogia_ctr': { title: 'CTR — Trilogia', unit: '%', data: [3.80, 4.12, 4.52, 6.94] },
+  'trilogia_cliques': { title: 'Cliques — Trilogia', unit: '', data: [210, 350, 313, 818] },
+  'trilogia_vis': { title: 'Visualizações — Trilogia', unit: '', data: [180, 290, 235, 678] },
+  'trilogia_vrate': { title: 'Taxa de Visualização — Trilogia', unit: '%', data: [75.0, 78.2, 75.08, 82.89] },
+  'trilogia_spend': { title: 'Valor Gasto — Trilogia', unit: 'R$', data: [120.50, 180.30, 237.38, 437.68] },
+  'trilogia_final': { title: 'Finalizações — Trilogia', unit: '', data: [5, 8, 7, 27] },
+  'trilogia_sales': { title: 'Vendas — Trilogia', unit: '', data: [0, 0, 0, 1] },
+
+  // Leads
+  'leads_cpm': { title: 'CPM — Leads', unit: 'R$', data: [10.50, 11.20, 11.09, 11.60] },
+  'leads_ctr': { title: 'CTR — Leads', unit: '%', data: [3.20, 3.85, 4.59, 3.70] },
+  'leads_cliques': { title: 'Cliques — Leads', unit: '', data: [400, 450, 556, 718] },
+  'leads_vis': { title: 'Visualizações — Leads', unit: '', data: [350, 400, 483, 618] },
+  'leads_count': { title: 'Leads Gerados', unit: '', data: [210, 255, 275, 346] },
+  'leads_cpl': { title: 'Custo por Lead', unit: 'R$', data: [0.45, 0.48, 0.49, 0.65] },
+  'leads_spend': { title: 'Valor Gasto — Leads', unit: 'R$', data: [94.50, 122.40, 134.30, 225.29] },
+  'leads_vrate': { title: 'Taxa de Visualização — Leads', unit: '%', data: [85.0, 86.5, 86.87, 86.07] },
+
+  // E-commerce
+  'eco_cpm': { title: 'CPM — E-commerce', unit: 'R$', data: [40.10, 41.50, 42.47, 37.71] },
+  'eco_ctr': { title: 'CTR — E-commerce', unit: '%', data: [4.20, 4.45, 4.33, 4.15] },
+  'eco_cliques': { title: 'Cliques — E-commerce', unit: '', data: [280, 310, 302, 262] },
+  'eco_vrate': { title: 'Taxa de Visualização — E-commerce', unit: '%', data: [72.0, 74.5, 75.17, 77.86] },
+  'eco_final': { title: 'Finalizações — E-commerce', unit: '', data: [4, 6, 5, 0] },
+  'eco_sales': { title: 'Vendas — E-commerce', unit: '', data: [2, 4, 3, 0] },
+  'eco_spend': { title: 'Valor Gasto — E-commerce', unit: 'R$', data: [250.0, 313.90, 358.08, 300.29] },
+  'eco_fat': { title: 'Faturamento — E-commerce', unit: 'R$', data: [342.0, 684.0, 513.0, 0] },
+
+  // Brand
+  'brand_cpm': { title: 'CPM — Reconhecimento', unit: 'R$', data: [1.15, 1.10, 1.05, 1.08] },
+  'brand_ctr': { title: 'CTR — Reconhecimento', unit: '%', data: [0.25, 0.28, 0.30, 0.29] },
+  'brand_alcance': { title: 'Alcance — Reconhecimento', unit: '', data: [45000, 50000, 52000, 57027] },
+  'brand_imp': { title: 'Impressões — Reconhecimento', unit: '', data: [55000, 60000, 62000, 68252] },
+  'brand_eng': { title: 'Engajamento — Reconhecimento', unit: '', data: [2800, 3200, 3500, 3954] },
+  'brand_spend': { title: 'Valor Gasto — Reconhecimento', unit: 'R$', data: [60.0, 65.0, 70.0, 73.52] }
+};
+
+const LABELS = ['04-11/05', '11-18/05', '18-26/05', '25/05-01/06'];
 
 function mkChart(id, type, labels, datasets, opts={}) {
   const ctx = document.getElementById(id).getContext('2d');
@@ -612,39 +671,102 @@ function mkChart(id, type, labels, datasets, opts={}) {
   });
 }
 
-// ── CAMPANHA 2 ──
+// ── DISTRIBUIÇÃO INVESTIMENTO ──
+mkChart('dist_spend', 'doughnut',
+  ['Trilogia', 'Lead Gen', 'E-commerce', 'Reconhecimento'],
+  [{
+    data: [437.68, 225.29, 300.29, 73.52],
+    backgroundColor: [accent2, accent3, accent1, accent4],
+    borderWidth: 0
+  }],
+  { cutout: '70%' }
+);
+
+// ── CAMPANHA 2 CHARTS ──
 mkChart('c2_rates','bar',
   ['Tx Visualização','Tx Conversão','CTR'],
   [
-    { label:'Atual (%)', data:[86.87,56.94,4.59], backgroundColor:[accent3+'cc',accent1+'cc',accent2+'cc'], borderRadius:6 },
-    { label:'Semana Ant. (%)', data:[87.21,59.30,4.12], backgroundColor:[accent3+'44',accent1+'44',accent2+'44'], borderRadius:6 }
+    { label:'Atual (%)', data:[86.07,55.99,3.70], backgroundColor:[accent3+'cc',accent1+'cc',accent2+'cc'], borderRadius:6 },
+    { label:'Semana Ant. (%)', data:[86.87,56.94,4.59], backgroundColor:[accent3+'44',accent1+'44',accent2+'44'], borderRadius:6 }
   ]
 );
 
 mkChart('c2_emails','bar',
-  ['E-mail 1','E-mail 2','E-mail 3','E-mail 4','E-mail 5','E-mail 6'],
+  ['E1','E2','E3','E4','E5','E6'],
   [
-    { label:'Tx Abertura Atual (%)', data:[17.59,12.56,12.57,13.08,11.62,12.07],
-      backgroundColor:[accent2+'cc',accent3+'cc',accent1+'cc',accent4+'cc',accent2+'99',accent3+'99'], borderRadius:6 }
+    { label:'Tx Abertura (%)', data:[17.49,13.98,11.11,10.0,8.87,7.53],
+      backgroundColor:accent2+'cc', borderRadius:6 }
   ]
 );
 
-// ── CAMPANHA 3 ──
-mkChart('c3_sales','bar',
-  ['Vendas','Finalizações de Compra'],
-  [
-    { label:'Atual', data:[3,5], backgroundColor:[accent3+'cc',accent2+'cc'], borderRadius:6 },
-    { label:'Semana Anterior', data:[4,5], backgroundColor:[accent3+'44',accent2+'44'], borderRadius:6 }
-  ]
-);
+// ── MODAL LOGIC ──
+const overlay = document.getElementById('modal-overlay');
+const closeBtn = document.getElementById('modal-close');
+const modalTitle = document.getElementById('modal-title');
+const kpis = document.querySelectorAll('.kpi');
+let historyChart = null;
 
-mkChart('c3_roi','bar',
-  ['ROI (%)','CAC (R$)'],
-  [
-    { label:'Atual', data:[43.26,119.36], backgroundColor:[accent3+'cc',accent4+'cc'], borderRadius:6 },
-    { label:'Semana Anterior', data:[117.90,78.47], backgroundColor:[accent3+'44',accent4+'44'], borderRadius:6 }
-  ]
-);
+function showHistory(metricId) {
+  const config = HISTORY_DATA[metricId];
+  if (!config) return;
+
+  modalTitle.innerText = config.title;
+  overlay.style.display = 'flex';
+
+  const ctx = document.getElementById('history-chart').getContext('2d');
+  
+  if (historyChart) historyChart.destroy();
+
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: LABELS,
+      datasets: [{
+        label: config.unit ? config.unit : 'Valor',
+        data: config.data,
+        borderColor: accent1,
+        backgroundColor: accent1 + '22',
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: accent1,
+        pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { 
+          backgroundColor: '#252d3f', 
+          padding: 12,
+          callbacks: {
+            label: (ctx) => `${config.unit} ${ctx.parsed.y}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#2a334720' } },
+        y: { grid: { color: '#2a3347' } }
+      }
+    }
+  });
+}
+
+kpis.forEach(kpi => {
+  kpi.addEventListener('click', () => {
+    const metric = kpi.getAttribute('data-metric');
+    if (metric) showHistory(metric);
+  });
+});
+
+closeBtn.addEventListener('click', () => {
+  overlay.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+  if (e.target === overlay) overlay.style.display = 'none';
+});
 </script>
 </body>
 </html>
